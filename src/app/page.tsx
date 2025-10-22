@@ -1,103 +1,76 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import Link from 'next/link';
+import { useLocalStorage } from '@/lib/useLocalStorage';
+import LastCheckInCard from '@/components/LastCheckInCard';
+import TodaysPlanCard from '@/components/TodaysPlanCard';
+import TodayOverview from '@/components/TodayOverview';
+import MomentumStrip from '@/components/MomentumStrip';
+import StreaksCard from '@/components/StreaksCard';
+import RecentActivityCard from '@/components/RecentActivityCard';
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+export default function Page() {
+  const [last] = useLocalStorage<any>('lastCheckIn', null);
+  const today = new Date();
+  const hasTodayCheckIn = last ? isSameDay(new Date(last.date), today) : false;
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="p-8">
+      {/* Hero / Command header */}
+      <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(98,255,203,0.15),transparent),radial-gradient(800px_400px_at_90%_110%,rgba(0,242,255,0.12),transparent),#0a0a0a] px-8 py-16 text-white">
+        <div className="absolute inset-0 opacity-40 blur-3xl" />
+        <div className="relative mx-auto flex max-w-screen-md flex-col items-start text-left">
+          <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">
+            Let’s get after it.
+          </h1>
+          <p className="mt-3 text-zinc-300">
+            Today is yours to control.
+          </p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          {/* Intelligent CTA */}
+          {hasTodayCheckIn ? (
+            <Link
+              href="/program"
+              className="mt-8 inline-flex items-center justify-center rounded-2xl px-6 py-3 text-lg font-semibold
+                         bg-gradient-to-r from-lime-400 to-cyan-400 text-black hover:opacity-90 active:opacity-80 transition"
+            >
+              View Today’s Plan
+            </Link>
+          ) : (
+            <Link
+              href="/check-in"
+              className="mt-8 inline-flex items-center justify-center rounded-2xl px-6 py-3 text-lg font-semibold
+                         bg-gradient-to-r from-lime-400 to-cyan-400 text-black hover:opacity-90 active:opacity-80 transition"
+            >
+              Start Today’s Check-in
+            </Link>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </section>
+
+      {/* Today Overview row */}
+      <div className="mt-8">
+        <TodayOverview />
+        <MomentumStrip />
+      </div>
+
+      {/* Status cards row */}
+      <div className="mt-8 grid max-w-5xl gap-6 md:grid-cols-2">
+        <LastCheckInCard />
+        <TodaysPlanCard />
+      </div>
+
+      {/* Streaks + Activity */}
+      <div className="mt-8 grid max-w-5xl gap-6 md:grid-cols-2">
+        <StreaksCard />
+        <RecentActivityCard />
+      </div>
     </div>
   );
 }
