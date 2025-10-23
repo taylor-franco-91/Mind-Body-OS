@@ -5,6 +5,7 @@ import WeekBar from '@/components/program/WeekBar';
 import DayPills from '@/components/program/DayPills';
 import TodaysSession from '@/components/program/TodaysSession';
 import { useLocalStorage } from '@/lib/useLocalStorage';
+import WeekSummaryStrip from '@/components/program/WeekSummaryStrip';
 
 type ProgramDay = {
     day: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
@@ -70,6 +71,8 @@ export default function ProgramPage() {
                     days={days}
                     onSelect={(d) => setSelectedDay(d)}
                 />
+                {/* NEW: Week Performance Strip */}
+                <WeekSummaryStrip percent={(daysCompleted / 7) * 100} />
             </div>
 
             {/* Today / Selected session */}
