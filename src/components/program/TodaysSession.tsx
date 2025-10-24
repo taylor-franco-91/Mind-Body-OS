@@ -9,72 +9,63 @@ export default function TodaysSession({
     locked,
     completed,
     isToday,
+    reviewOnly, // NEW
 }: {
-    aiActive?: boolean;
+    aiActive: boolean;
     title: string;
-    blocks: { kind: 'Warm-up' | 'Main' | 'Finisher' | 'Cooldown'; detail: string }[];
+    blocks: { kind: string; detail: string }[];
     progressPct: number;
     ctaHref: string;
-    locked?: boolean;
-    completed?: boolean;
-    isToday?: boolean;
+    locked: boolean;
+    completed: boolean;
+    isToday: boolean;
+    reviewOnly?: boolean; // NEW
 }) {
     return (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            {/* progress bar */}
-            <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                    className="h-full rounded-full bg-gradient-to-r from-lime-400 to-cyan-400"
-                    style={{ width: `${progressPct}%` }}
-                />
-            </div>
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <div className="text-sm text-zinc-400">{aiActive ? 'AI-Optimized Session' : 'Standard Session'}</div>
+                    <h3 className="mt-1 text-xl font-semibold">{title}</h3>
+                </div>
 
-            <div className="flex items-center justify-between">
-                <div className="text-sm text-zinc-400">{isToday ? 'Today’s Session' : 'Selected Session'}</div>
-                {aiActive && (
-                    <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-400/30">
-                        Adaptive AI · calibrated
+                {/* Right side controls */}
+                {locked ? (
+                    <span className="rounded-full bg-black/40 px-3 py-1 text-sm text-zinc-500 ring-1 ring-white/10">
+                        Locked
                     </span>
-                )}
+                ) : completed ? (
+                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm text-emerald-300 ring-1 ring-emerald-400/30">
+                        Completed
+                    </span>
+                ) : reviewOnly ? (
+                    <span className="rounded-full bg-rose-500/15 px-3 py-1 text-sm text-rose-300 ring-1 ring-rose-300/30">
+                        Review Only (Missed)
+                    </span>
+                ) : isToday ? (
+                    <a
+                        href={ctaHref}
+                        className="rounded-2xl bg-gradient-to-r from-lime-400 to-cyan-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
+                    >
+                        Start Workout
+                    </a>
+                ) : null}
             </div>
 
-            <div className="mt-1 text-xl font-semibold">{title}</div>
-
-            {/* state badges */}
-            <div className="mt-2 flex gap-2 text-xs">
-                {completed && <Badge text="Completed" tone="ok" />}
-                {locked && <Badge text="Locked" tone="warn" />}
-                {isToday && <Badge text="Today" tone="now" />}
-            </div>
+            {/* Progress hint */}
+            {isToday && !completed && !reviewOnly && (
+                <div className="mt-3 text-xs text-zinc-400">{progressPct}% planned for today</div>
+            )}
 
             {/* Blocks */}
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid gap-2">
                 {blocks.map((b, i) => (
-                    <div key={i} className="rounded-xl border border-white/10 bg-black/30 p-4">
-                        <div className="text-xs text-zinc-400">{b.kind}</div>
-                        <div className="mt-1 text-sm text-zinc-100">{b.detail}</div>
+                    <div key={i} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                        <div className="text-xs uppercase tracking-wide text-zinc-400">{b.kind}</div>
+                        <div className="text-sm text-zinc-200">{b.detail}</div>
                     </div>
                 ))}
             </div>
-
-            {/* CTA */}
-            <a
-                href={locked ? '#' : ctaHref}
-                className={`mt-4 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold
-          ${locked
-                        ? 'bg-white/10 text-zinc-500 cursor-not-allowed'
-                        : 'bg-emerald-400 text-black hover:opacity-90'}`}
-            >
-                {locked ? 'Locked' : completed ? 'View Summary' : 'Start Workout'}
-            </a>
         </div>
     );
-}
-
-function Badge({ text, tone }: { text: string; tone: 'ok' | 'warn' | 'now' }) {
-    const cls =
-        tone === 'ok' ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30' :
-            tone === 'warn' ? 'bg-amber-400/10  text-amber-300  ring-amber-400/30' :
-                'bg-cyan-400/10   text-cyan-200   ring-cyan-400/30';
-    return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${cls}`}>{text}</span>;
 }

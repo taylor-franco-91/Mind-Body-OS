@@ -24,3 +24,77 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* --- Micro motion (subtle, premium) --- */
+@keyframes fade-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-slide-left {
+  0% {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes soft-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fade-slide-up 240ms ease-out;
+}
+
+.animate-fade-slide-left {
+  animation: fade-slide-left 220ms ease-out;
+}
+
+.animate-soft-pop {
+  animation: soft-pop 200ms ease-out;
+}
+
+/* --- Halo pulse (fast, premium) --- */
+@keyframes halo-pulse {
+  0% {
+    opacity: .8;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+.halo-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid #a3e635;
+  /* lime-400 */
+}
+
+.animate-halo {
+  animation: halo-pulse 700ms ease-out forwards;
+}
