@@ -9,7 +9,8 @@ export default function TodaysSession({
     locked,
     completed,
     isToday,
-    reviewOnly, // NEW
+    reviewOnly,
+    onComplete, // NEW
 }: {
     aiActive: boolean;
     title: string;
@@ -19,17 +20,24 @@ export default function TodaysSession({
     locked: boolean;
     completed: boolean;
     isToday: boolean;
-    reviewOnly?: boolean; // NEW
+    reviewOnly?: boolean;
+    onComplete?: () => void; // NEW
 }) {
+    const canComplete = Boolean(
+        onComplete && isToday && !completed && !reviewOnly && !locked
+    );
+
     return (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <div className="text-sm text-zinc-400">{aiActive ? 'AI-Optimized Session' : 'Standard Session'}</div>
+                    <div className="text-sm text-zinc-400">
+                        {aiActive ? 'AI-Optimized Session' : 'Standard Session'}
+                    </div>
                     <h3 className="mt-1 text-xl font-semibold">{title}</h3>
                 </div>
 
-                {/* Right side controls */}
+                {/* Right-side controls */}
                 {locked ? (
                     <span className="rounded-full bg-black/40 px-3 py-1 text-sm text-zinc-500 ring-1 ring-white/10">
                         Locked
@@ -43,17 +51,29 @@ export default function TodaysSession({
                         Review Only (Missed)
                     </span>
                 ) : isToday ? (
-                    <a
-                        href={ctaHref}
-                        className="rounded-2xl bg-gradient-to-r from-lime-400 to-cyan-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
-                    >
-                        Start Workout
-                    </a>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={ctaHref}
+                            className="rounded-2xl bg-gradient-to-r from-lime-400 to-cyan-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
+                        >
+                            Start Workout
+                        </a>
+                        {canComplete && (
+                            <button
+                                type="button"
+                                onClick={onComplete}
+                                className="rounded-2xl px-3 py-2 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-400/40 hover:bg-emerald-400/10"
+                                title="Mark today complete"
+                            >
+                                Mark Complete
+                            </button>
+                        )}
+                    </div>
                 ) : null}
             </div>
 
             {/* Progress hint */}
-            {isToday && !completed && !reviewOnly && (
+            {isToday && !completed && !reviewOnly && !locked && (
                 <div className="mt-3 text-xs text-zinc-400">{progressPct}% planned for today</div>
             )}
 

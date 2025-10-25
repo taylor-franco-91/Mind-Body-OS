@@ -1,124 +1,219 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import WeekBar from '@/components/program/WeekBar';
 import DayPills from '@/components/program/DayPills';
 import TodaysSession from '@/components/program/TodaysSession';
-import { useLocalStorage } from '@/lib/useLocalStorage';
 import WeekSummaryStrip from '@/components/program/WeekSummaryStrip';
+import { useLocalStorage } from '@/lib/useLocalStorage';
+
+import {
+    loadClock, saveClock, localISODate, todayKey,
+    dayDelta, advanceOneDay, isNewWeekBoundary, DOW_KEYS, fromLocalISO
+} from '@/lib/programClock';
+
+import {
+    loadWeekState, saveWeekState,
+    addCompleted, addMissed, isCompleted, isMissed, resetWeek
+} from '@/lib/programStorage';
 
 type ProgramDay = {
     day: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
     label: string;
     completed: boolean;
-    missed?: boolean;          // NEW
+    missed?: boolean;
     locked: boolean;
     isToday: boolean;
     type: string;
     activity: string;
 };
 
+const DAY_LABEL: Record<ProgramDay['day'], string> = {
+    MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday',
+    FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday'
+};
+
 export default function ProgramPage() {
     const [last] = useLocalStorage<any>('lastCheckIn', null);
     const aiActive = Boolean(last);
 
-    // Base week snapshot (could come from API later)
-    const currentWeek = 3;
-    const totalWeeks = 12;
-    const baseDays: ProgramDay[] = [
-        { day: 'MON', label: 'Monday', completed: true, locked: false, isToday: false, type: 'Upper', activity: 'Push Power' },
-        { day: 'TUE', label: 'Tuesday', completed: true, locked: false, isToday: false, type: 'Mindset', activity: 'Meditation' },
-        { day: 'WED', label: 'Wednesday', completed: true, locked: false, isToday: false, type: 'Lower', activity: 'Squat Focus' },
-        { day: 'THU', label: 'Thursday', completed: false, locked: false, isToday: true, type: 'Upper', activity: 'Pull Power' },
-        { day: 'FRI', label: 'Friday', completed: false, locked: true, isToday: false, type: 'Full Body', activity: 'HIIT Circuit' },
-        { day: 'SAT', label: 'Saturday', completed: false, locked: true, isToday: false, type: 'Mindset', activity: 'Journaling' },
-        { day: 'SUN', label: 'Sunday', completed: false, locked: true, isToday: false, type: 'Recovery', activity: 'Active Rest' },
+    const [clockWeek, setClockWeek] = useState<number>(() => loadClock().currentWeek);
+    const [tick, setTick] = useState(0);
+
+    function catchUpToToday() {
+        let clock = loadClock();
+        const todayISO = localISODate();
+        const delta = dayDelta(clock.lastDateISO, todayISO);
+
+        if (delta > 0) {
+            for (let i = 0; i < delta; i++) {
+                const prevISO = clock.lastDateISO;
+                const prevDayKey = todayKey(fromLocalISO(prevISO)); // LOCAL safe
+                const wk = clock.currentWeek;
+
+                if (!isCompleted(wk, prevDayKey)) addMissed(wk, prevDayKey);
+
+                const nextClock = advanceOneDay(clock);
+                if (isNewWeekBoundary(clock.lastDateISO, nextClock.lastDateISO)) {
+                    resetWeek(nextClock.currentWeek);
+                }
+                clock = nextClock;
+            }
+            clock.lastDateISO = todayISO;
+            saveClock(clock);
+            setClockWeek(clock.currentWeek);
+            setTick(x => x + 1);
+        } else {
+            if (clock.lastDateISO !== todayISO) {
+                clock.lastDateISO = todayISO;
+                saveClock(clock);
+            }
+            setClockWeek(clock.currentWeek);
+        }
+    }
+
+    useEffect(() => {
+        catchUpToToday();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // live midnight heartbeat
+    const lastDateRef = useRef(localISODate());
+    useEffect(() => {
+        const id = setInterval(() => {
+            const nowISO = localISODate();
+            if (nowISO !== lastDateRef.current) {
+                lastDateRef.current = nowISO;
+                catchUpToToday();
+            }
+        }, 30_000);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // NEW: react to timezone changes (from TimezoneWatcher)
+    useEffect(() => {
+        function onTZChange() {
+            catchUpToToday();
+        }
+        window.addEventListener('os:timezone-changed', onTZChange);
+        return () => window.removeEventListener('os:timezone-changed', onTZChange);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // REAL today (no parsing issues)
+    const selectedWeek = clockWeek;
+    const todayDayKey = todayKey(); // uses new Date() in local time
+    const todayIdx = DOW_KEYS.indexOf(todayDayKey);
+
+    const template: Array<Pick<ProgramDay, 'type' | 'activity'>> = [
+        { type: 'Upper', activity: 'Push Power' },
+        { type: 'Mindset', activity: 'Meditation' },
+        { type: 'Lower', activity: 'Squat Focus' },
+        { type: 'Upper', activity: 'Pull Power' },
+        { type: 'Full Body', activity: 'HIIT Circuit' },
+        { type: 'Mindset', activity: 'Journaling' },
+        { type: 'Recovery', activity: 'Active Rest' },
     ];
 
-    const [selectedWeek, setSelectedWeek] = useState<number>(currentWeek);
+    const weekState = useMemo(() => loadWeekState(selectedWeek), [selectedWeek, tick]);
 
-    // Compute derived days with "missed" applied to any past unfinished day.
-    const computedDays = useMemo<ProgramDay[]>(() => {
-        const todayIdx = baseDays.findIndex(d => d.isToday) ?? 0;
-        return baseDays.map((d, idx) => {
-            // Future protection: keep future locked no matter what
-            const forceLocked = idx > todayIdx ? true : d.locked;
+    const computedDays: ProgramDay[] = useMemo(() => {
+        return DOW_KEYS.map((dk, idx) => {
+            const completed = isCompleted(selectedWeek, dk);
+            const missed = isMissed(selectedWeek, dk);
+            const isTodayFlag = idx === todayIdx;
+            const locked = idx > todayIdx;
+            const base = template[idx];
 
-            // Missed: past but not completed
-            const missed = idx < todayIdx && !d.completed ? true : false;
-
-            return { ...d, locked: forceLocked, missed };
+            return {
+                day: dk,
+                label: DAY_LABEL[dk],
+                completed,
+                missed,
+                locked,
+                isToday: isTodayFlag,
+                type: base.type,
+                activity: base.activity,
+            };
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedWeek]); // (week change could swap the baseDays in a real app)
+    }, [selectedWeek, todayIdx, tick]);
 
-    // Select default day: today, else first
-    const [selectedDay, setSelectedDay] = useState<ProgramDay>(
-        computedDays.find(d => d.isToday) || computedDays[0]
-    );
+    const daysCompleted = computedDays.filter(d => d.completed).length;
+    const todayDay = computedDays[todayIdx];
+
+    // Past-day review while keeping today anchored
+    const [viewDayKey, setViewDayKey] = useState<ProgramDay['day']>(todayDay.day);
     useEffect(() => {
-        // Keep selection in sync if week/days change
-        const freshToday = computedDays.find(d => d.isToday);
-        if (freshToday) setSelectedDay(freshToday);
-    }, [computedDays]);
+        setViewDayKey(todayDay.day);
+    }, [todayDay.day]);
+
+    const viewingDay = computedDays.find(d => d.day === viewDayKey) ?? todayDay;
+    const reviewOnly = viewingDay?.missed === true;
 
     const weekTitle = useMemo(() => {
         const titles = ['Foundation', 'Load', 'Power', 'Density', 'Deload', 'Strength', 'Capacity', 'Power', 'Deload', 'Peak', 'Taper', 'Finish'];
         return titles[(selectedWeek - 1) % titles.length];
     }, [selectedWeek]);
 
-    const daysCompleted = computedDays.filter(d => d.completed).length;
-
-    const reviewOnly = selectedDay.missed === true; // Missed days = review-only
+    function handleCompleteToday() {
+        if (!todayDay || todayDay.locked || todayDay.completed || todayDay.missed) return;
+        addCompleted(selectedWeek, todayDay.day);
+        const s = loadWeekState(selectedWeek);
+        s.missed = s.missed.filter(d => d !== todayDay.day);
+        saveWeekState(selectedWeek, s);
+        setTick(x => x + 1);
+    }
 
     return (
         <div className="p-8 text-white">
             <h1 className="text-3xl font-bold">12-Week Program</h1>
             <p className="mt-2 text-zinc-400">Week {selectedWeek}: {weekTitle}</p>
 
-            {/* Week timeline (future weeks locked) */}
             <div key={`wk-${selectedWeek}`} className="mt-6 animate-fade-slide-left">
                 <WeekBar
                     currentWeek={selectedWeek}
-                    totalWeeks={totalWeeks}
-                    unlockedThroughWeek={currentWeek}
-                    onSelect={setSelectedWeek}
+                    totalWeeks={12}
+                    unlockedThroughWeek={selectedWeek}
+                    onSelect={() => { }}
                 />
             </div>
 
-            {/* Day chips + completion summary */}
             <div key={`days-${selectedWeek}`} className="mt-6 animate-fade-slide-up">
                 <div className="mb-2 flex items-center justify-between">
-                    <div className="text-sm text-zinc-400">Select a day</div>
+                    <div className="text-sm text-zinc-400">This week</div>
                     <div className="text-xs font-semibold text-zinc-300">{daysCompleted}/7 completed</div>
                 </div>
                 <DayPills
                     days={computedDays}
-                    onSelect={(d) => setSelectedDay(d)}
-                    selectedDayKey={selectedDay.day}
+                    selectedDayKey={viewDayKey}
+                    todayKey={todayDay.day}
+                    onSelect={(d) => {
+                        if (!d.locked) setViewDayKey(d.day);
+                    }}
                 />
-
-                {/* Week Performance Strip (real % only counts completed) */}
                 <WeekSummaryStrip percent={(daysCompleted / 7) * 100} />
             </div>
 
-            {/* Today / Selected session */}
-            <div key={`sess-${selectedDay.day}`} className="mt-6 animate-soft-pop">
+            <div key={`sess-${viewingDay.day}`} className="mt-6 animate-soft-pop">
                 <TodaysSession
                     aiActive={aiActive}
-                    title={`${selectedDay.label}: ${selectedDay.type} · ${selectedDay.activity}`}
+                    title={`${viewingDay.label}: ${viewingDay.type} · ${viewingDay.activity}`}
                     blocks={[
                         { kind: 'Warm-up', detail: '8–10 min mobility + activation' },
                         { kind: 'Main', detail: 'Pull-ups 4×8–10 · Rows 4×10 · Face Pulls 3×15 · Curls 3×12' },
                         { kind: 'Finisher', detail: 'Short EMOM · 6–8 min' },
                         { kind: 'Cooldown', detail: 'Breath reset 2 min · light stretch' },
                     ]}
-                    progressPct={selectedDay.isToday ? 30 : 0}
+                    progressPct={viewingDay.isToday && !viewingDay.completed ? 30 : 100}
                     ctaHref="/program"
-                    locked={selectedDay.locked}
-                    completed={selectedDay.completed}
-                    isToday={selectedDay.isToday}
-                    reviewOnly={reviewOnly}      // NEW
+                    locked={viewingDay.locked}
+                    completed={viewingDay.completed}
+                    isToday={viewingDay.isToday}
+                    reviewOnly={reviewOnly}
+                    onComplete={
+                        viewingDay.isToday && !viewingDay.completed && !reviewOnly ? handleCompleteToday : undefined
+                    }
                 />
             </div>
         </div>

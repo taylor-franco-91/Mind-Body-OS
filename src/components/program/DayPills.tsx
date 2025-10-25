@@ -4,7 +4,7 @@ type Day = {
     day: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
     label: string;
     completed: boolean;
-    missed?: boolean;        // NEW
+    missed?: boolean;
     locked: boolean;
     isToday: boolean;
     type: string;
@@ -15,63 +15,55 @@ export default function DayPills({
     days,
     onSelect,
     selectedDayKey,
+    todayKey,
 }: {
     days: Day[];
     onSelect: (d: Day) => void;
     selectedDayKey?: Day['day'];
+    todayKey?: Day['day'];
 }) {
     return (
         <div className="flex flex-wrap gap-2">
             {days.map((d) => {
-                const state =
-                    d.isToday ? 'today' :
-                        d.completed ? 'done' :
-                            d.missed ? 'missed' :
-                                d.locked ? 'locked' : 'idle';
-
-                const cls =
-                    state === 'today' ? 'bg-gradient-to-r from-lime-400 to-cyan-400 text-black ring-lime-300' :
-                        state === 'done' ? 'bg-white/10 text-zinc-200 ring-white/15' :
-                            state === 'missed' ? 'bg-white/5 text-rose-300 ring-rose-300/30' :
-                                state === 'locked' ? 'bg-black/30 text-zinc-500 ring-white/10 cursor-not-allowed' :
-                                    'bg-white/5 text-zinc-300 ring-white/10 hover:bg-white/10';
-
                 const isSelected = selectedDayKey === d.day;
+                const isToday = todayKey === d.day;
+
+                // Base style
+                let cls =
+                    'relative rounded-full px-3 py-1.5 text-sm font-medium transition ring-1 ring-white/10 ';
+
+                if (d.locked) {
+                    cls += 'bg-white/5 text-zinc-500 cursor-not-allowed';
+                } else if (isToday) {
+                    // TODAY = same style as active WeekBar button
+                    cls += 'bg-gradient-to-r from-lime-400 to-cyan-400 text-black';
+                } else if (d.completed) {
+                    cls += 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/25';
+                } else if (d.missed) {
+                    cls += 'bg-rose-500/15 text-rose-200 hover:bg-rose-500/20';
+                } else {
+                    cls += 'bg-white/5 text-zinc-200 hover:bg-white/10';
+                }
+
+                // Viewing past day => subtle halo (not for today)
+                const viewHalo =
+                    isSelected && !isToday
+                        ? 'after:absolute after:inset-[-4px] after:rounded-full after:ring-1 after:ring-cyan-300/40'
+                        : '';
 
                 return (
                     <button
                         key={d.day}
-                        onClick={() => !d.locked && onSelect(d)}
-                        className={`relative rounded-full px-3 py-1.5 text-sm font-semibold ring-1 transition ${cls}`}
-                        title={`${d.label}: ${d.type} · ${d.activity}`}
-                        aria-disabled={d.locked}
+                        onClick={() => onSelect(d)}
+                        disabled={d.locked}
+                        className={`${cls} ${viewHalo}`}
+                        title={d.label}
                     >
-                        {/* Halo pulse when selected */}
-                        {isSelected && <span className="halo-ring animate-halo" aria-hidden />}
-
-                        {d.day}
-
-                        {d.completed && (
-                            <span
-                                aria-hidden
-                                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-emerald-400 text-[10px] font-black text-black ring-1 ring-emerald-300"
-                            >
-                                ✓
-                            </span>
-                        )}
-
-                        {d.missed && !d.completed && (
-                            <span
-                                aria-hidden
-                                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[10px] font-black text-black ring-1 ring-rose-300"
-                            >
-                                ×
-                            </span>
-                        )}
+                        <span className="mr-2 text-[10px] opacity-70">{d.day}</span>
+                        {d.completed ? '✔' : d.missed ? '✕' : '•'}
                     </button>
                 );
             })}
         </div>
     );
 }
-
