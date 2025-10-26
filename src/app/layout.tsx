@@ -2,7 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Sidebar from '@/components/Sidebar';
-import ClientTimezoneWatcher from '@/components/ClientTimezoneWatcher';
+
 
 export const metadata: Metadata = {
   title: 'MindBody OS',
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </main>
 
         {/* System-level watcher + bottom pulse banner (client-only) */}
-        <ClientTimezoneWatcher />
+
       </body>
     </html>
   );

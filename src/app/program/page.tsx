@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import WeekBar from '@/components/program/WeekBar';
 import DayPills from '@/components/program/DayPills';
 import TodaysSession from '@/components/program/TodaysSession';
@@ -34,6 +35,7 @@ const DAY_LABEL: Record<ProgramDay['day'], string> = {
 };
 
 export default function ProgramPage() {
+    const router = useRouter();
     const [last] = useLocalStorage<any>('lastCheckIn', null);
     const aiActive = Boolean(last);
 
@@ -48,7 +50,7 @@ export default function ProgramPage() {
         if (delta > 0) {
             for (let i = 0; i < delta; i++) {
                 const prevISO = clock.lastDateISO;
-                const prevDayKey = todayKey(fromLocalISO(prevISO)); // LOCAL safe
+                const prevDayKey = todayKey(fromLocalISO(prevISO));
                 const wk = clock.currentWeek;
 
                 if (!isCompleted(wk, prevDayKey)) addMissed(wk, prevDayKey);
@@ -91,19 +93,8 @@ export default function ProgramPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // NEW: react to timezone changes (from TimezoneWatcher)
-    useEffect(() => {
-        function onTZChange() {
-            catchUpToToday();
-        }
-        window.addEventListener('os:timezone-changed', onTZChange);
-        return () => window.removeEventListener('os:timezone-changed', onTZChange);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // REAL today (no parsing issues)
     const selectedWeek = clockWeek;
-    const todayDayKey = todayKey(); // uses new Date() in local time
+    const todayDayKey = todayKey();
     const todayIdx = DOW_KEYS.indexOf(todayDayKey);
 
     const template: Array<Pick<ProgramDay, 'type' | 'activity'>> = [
@@ -142,7 +133,6 @@ export default function ProgramPage() {
     const daysCompleted = computedDays.filter(d => d.completed).length;
     const todayDay = computedDays[todayIdx];
 
-    // Past-day review while keeping today anchored
     const [viewDayKey, setViewDayKey] = useState<ProgramDay['day']>(todayDay.day);
     useEffect(() => {
         setViewDayKey(todayDay.day);
@@ -157,13 +147,25 @@ export default function ProgramPage() {
     }, [selectedWeek]);
 
     function handleCompleteToday() {
-        if (!todayDay || todayDay.locked || todayDay.completed || todayDay.missed) return;
-        addCompleted(selectedWeek, todayDay.day);
+        const d = viewingDay;
+        if (!d || d.locked || d.completed || d.missed) return;
+        addCompleted(selectedWeek, d.day);
         const s = loadWeekState(selectedWeek);
-        s.missed = s.missed.filter(d => d !== todayDay.day);
+        s.missed = s.missed.filter(x => x !== d.day);
         saveWeekState(selectedWeek, s);
         setTick(x => x + 1);
+        // Broadcast so Library / other tabs can sync if open
+        window.dispatchEvent(new CustomEvent('os:workout-completed', { detail: { week: selectedWeek, day: d.day } }));
     }
+
+    // Listen for completion from Library tab
+    useEffect(() => {
+        function onCompleted() {
+            setTick(x => x + 1);
+        }
+        window.addEventListener('os:workout-completed', onCompleted as EventListener);
+        return () => window.removeEventListener('os:workout-completed', onCompleted as EventListener);
+    }, []);
 
     return (
         <div className="p-8 text-white">
@@ -206,14 +208,16 @@ export default function ProgramPage() {
                         { kind: 'Cooldown', detail: 'Breath reset 2 min · light stretch' },
                     ]}
                     progressPct={viewingDay.isToday && !viewingDay.completed ? 30 : 100}
-                    ctaHref="/program"
                     locked={viewingDay.locked}
                     completed={viewingDay.completed}
                     isToday={viewingDay.isToday}
                     reviewOnly={reviewOnly}
-                    onComplete={
-                        viewingDay.isToday && !viewingDay.completed && !reviewOnly ? handleCompleteToday : undefined
-                    }
+                    onStart={() => {
+                        // Navigate to Library for this day; keep UI in-progress locally
+                        const params = new URLSearchParams({ week: String(selectedWeek), day: viewingDay.day });
+                        router.push(`/library?${params.toString()}`);
+                    }}
+                    onComplete={handleCompleteToday}
                 />
             </div>
         </div>

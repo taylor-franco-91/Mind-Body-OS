@@ -1,31 +1,40 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
+type Phase = 'idle' | 'in_progress' | 'completed';
+
 export default function TodaysSession({
     aiActive,
     title,
     blocks,
     progressPct,
-    ctaHref,
     locked,
     completed,
     isToday,
     reviewOnly,
-    onComplete, // NEW
+    onStart,
+    onComplete,
 }: {
     aiActive: boolean;
     title: string;
     blocks: { kind: string; detail: string }[];
     progressPct: number;
-    ctaHref: string;
     locked: boolean;
     completed: boolean;
     isToday: boolean;
     reviewOnly?: boolean;
-    onComplete?: () => void; // NEW
+    onStart?: () => void;
+    onComplete?: () => void;
 }) {
-    const canComplete = Boolean(
-        onComplete && isToday && !completed && !reviewOnly && !locked
-    );
+    const [phase, setPhase] = useState<Phase>('idle');
+
+    useEffect(() => {
+        if (completed) setPhase('completed');
+        else setPhase('idle');
+    }, [title, completed, isToday]);
+
+    const canActToday = isToday && !completed && !reviewOnly && !locked;
 
     return (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -37,47 +46,66 @@ export default function TodaysSession({
                     <h3 className="mt-1 text-xl font-semibold">{title}</h3>
                 </div>
 
-                {/* Right-side controls */}
                 {locked ? (
                     <span className="rounded-full bg-black/40 px-3 py-1 text-sm text-zinc-500 ring-1 ring-white/10">
                         Locked
                     </span>
-                ) : completed ? (
+                ) : completed || phase === 'completed' ? (
                     <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm text-emerald-300 ring-1 ring-emerald-400/30">
-                        Completed
+                        Workout complete
                     </span>
                 ) : reviewOnly ? (
                     <span className="rounded-full bg-rose-500/15 px-3 py-1 text-sm text-rose-300 ring-1 ring-rose-300/30">
                         Review Only (Missed)
                     </span>
-                ) : isToday ? (
+                ) : canActToday ? (
                     <div className="flex items-center gap-2">
-                        <a
-                            href={ctaHref}
-                            className="rounded-2xl bg-gradient-to-r from-lime-400 to-cyan-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
-                        >
-                            Start Workout
-                        </a>
-                        {canComplete && (
-                            <button
-                                type="button"
-                                onClick={onComplete}
-                                className="rounded-2xl px-3 py-2 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-400/40 hover:bg-emerald-400/10"
-                                title="Mark today complete"
-                            >
-                                Mark Complete
-                            </button>
+                        {phase === 'idle' && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPhase('in_progress');
+                                        onStart?.();
+                                    }}
+                                    className="rounded-xl bg-gradient-to-r from-lime-400 to-cyan-400 px-3 py-1.5 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
+                                >
+                                    Start Workout
+                                </button>
+                                <button
+                                    disabled
+                                    className="rounded-xl bg-white/10 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-white/15 cursor-not-allowed"
+                                >
+                                    Mark Complete
+                                </button>
+                            </>
+                        )}
+
+                        {phase === 'in_progress' && (
+                            <>
+                                <span className="rounded-xl bg-white/10 px-3 py-1.5 text-sm text-white ring-1 ring-white/15">
+                                    Workout in progress
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPhase('completed');
+                                        onComplete?.();
+                                    }}
+                                    className="rounded-xl bg-gradient-to-r from-lime-400 to-cyan-400 px-3 py-1.5 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
+                                >
+                                    Mark Complete
+                                </button>
+                            </>
                         )}
                     </div>
                 ) : null}
             </div>
 
-            {/* Progress hint */}
-            {isToday && !completed && !reviewOnly && !locked && (
+            {!completed && phase !== 'completed' && isToday && !reviewOnly && (
                 <div className="mt-3 text-xs text-zinc-400">{progressPct}% planned for today</div>
             )}
 
-            {/* Blocks */}
             <div className="mt-4 grid gap-2">
                 {blocks.map((b, i) => (
                     <div key={i} className="rounded-lg border border-white/10 bg-black/30 p-3">
@@ -86,6 +114,11 @@ export default function TodaysSession({
                     </div>
                 ))}
             </div>
+
+            {/* Echo when finished locally (in case parent completion is async) */}
+            {phase === 'completed' && !completed && (
+                <div className="mt-3 text-xs text-emerald-300">Workout finished</div>
+            )}
         </div>
     );
 }

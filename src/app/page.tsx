@@ -10,6 +10,7 @@ import StreaksCard from '@/components/StreaksCard';
 import RecentActivityCard from '@/components/RecentActivityCard';
 import SectionHeader from '@/components/SectionHeader';
 
+
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear()
     && a.getMonth() === b.getMonth()
@@ -53,6 +54,7 @@ export default function Page() {
         {/* subtle, living background */}
         <div className="pointer-events-none absolute inset-0 opacity-60">
           <div className="absolute -inset-[40%] animate-hero-shimmer bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(98,255,203,0.10),transparent),radial-gradient(800px_400px_at_90%_110%,rgba(0,242,255,0.08),transparent)]" />
+
         </div>
 
         <div className="relative mx-auto flex max-w-screen-md flex-col items-start text-left animate-fade-up">
