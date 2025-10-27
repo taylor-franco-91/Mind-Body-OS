@@ -1,7 +1,7 @@
 'use client';
 
+import Mount from '@/components/Mount';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import WeekBar from '@/components/program/WeekBar';
 import DayPills from '@/components/program/DayPills';
 import TodaysSession from '@/components/program/TodaysSession';
@@ -35,7 +35,6 @@ const DAY_LABEL: Record<ProgramDay['day'], string> = {
 };
 
 export default function ProgramPage() {
-    const router = useRouter();
     const [last] = useLocalStorage<any>('lastCheckIn', null);
     const aiActive = Boolean(last);
 
@@ -79,7 +78,6 @@ export default function ProgramPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // live midnight heartbeat
     const lastDateRef = useRef(localISODate());
     useEffect(() => {
         const id = setInterval(() => {
@@ -134,9 +132,7 @@ export default function ProgramPage() {
     const todayDay = computedDays[todayIdx];
 
     const [viewDayKey, setViewDayKey] = useState<ProgramDay['day']>(todayDay.day);
-    useEffect(() => {
-        setViewDayKey(todayDay.day);
-    }, [todayDay.day]);
+    useEffect(() => { setViewDayKey(todayDay.day); }, [todayDay.day]);
 
     const viewingDay = computedDays.find(d => d.day === viewDayKey) ?? todayDay;
     const reviewOnly = viewingDay?.missed === true;
@@ -147,79 +143,67 @@ export default function ProgramPage() {
     }, [selectedWeek]);
 
     function handleCompleteToday() {
-        const d = viewingDay;
-        if (!d || d.locked || d.completed || d.missed) return;
-        addCompleted(selectedWeek, d.day);
+        if (!todayDay || todayDay.locked || todayDay.completed || todayDay.missed) return;
+        addCompleted(selectedWeek, todayDay.day);
         const s = loadWeekState(selectedWeek);
-        s.missed = s.missed.filter(x => x !== d.day);
+        s.missed = s.missed.filter(d => d !== todayDay.day);
         saveWeekState(selectedWeek, s);
         setTick(x => x + 1);
-        // Broadcast so Library / other tabs can sync if open
-        window.dispatchEvent(new CustomEvent('os:workout-completed', { detail: { week: selectedWeek, day: d.day } }));
     }
 
-    // Listen for completion from Library tab
-    useEffect(() => {
-        function onCompleted() {
-            setTick(x => x + 1);
-        }
-        window.addEventListener('os:workout-completed', onCompleted as EventListener);
-        return () => window.removeEventListener('os:workout-completed', onCompleted as EventListener);
-    }, []);
-
     return (
-        <div className="p-8 text-white">
-            <h1 className="text-3xl font-bold">12-Week Program</h1>
-            <p className="mt-2 text-zinc-400">Week {selectedWeek}: {weekTitle}</p>
+        <Mount>
+            <div className="p-8 text-white">
+                <h1 className="text-3xl font-bold">12-Week Program</h1>
+                <p className="mt-2 text-zinc-400">Week {selectedWeek}: {weekTitle}</p>
 
-            <div key={`wk-${selectedWeek}`} className="mt-6 animate-fade-slide-left">
-                <WeekBar
-                    currentWeek={selectedWeek}
-                    totalWeeks={12}
-                    unlockedThroughWeek={selectedWeek}
-                    onSelect={() => { }}
-                />
-            </div>
-
-            <div key={`days-${selectedWeek}`} className="mt-6 animate-fade-slide-up">
-                <div className="mb-2 flex items-center justify-between">
-                    <div className="text-sm text-zinc-400">This week</div>
-                    <div className="text-xs font-semibold text-zinc-300">{daysCompleted}/7 completed</div>
+                <div key={`wk-${selectedWeek}`} className="mt-6 animate-fade-slide-left">
+                    <WeekBar
+                        currentWeek={selectedWeek}
+                        totalWeeks={12}
+                        unlockedThroughWeek={selectedWeek}
+                        onSelect={() => { }}
+                    />
                 </div>
-                <DayPills
-                    days={computedDays}
-                    selectedDayKey={viewDayKey}
-                    todayKey={todayDay.day}
-                    onSelect={(d) => {
-                        if (!d.locked) setViewDayKey(d.day);
-                    }}
-                />
-                <WeekSummaryStrip percent={(daysCompleted / 7) * 100} />
-            </div>
 
-            <div key={`sess-${viewingDay.day}`} className="mt-6 animate-soft-pop">
-                <TodaysSession
-                    aiActive={aiActive}
-                    title={`${viewingDay.label}: ${viewingDay.type} · ${viewingDay.activity}`}
-                    blocks={[
-                        { kind: 'Warm-up', detail: '8–10 min mobility + activation' },
-                        { kind: 'Main', detail: 'Pull-ups 4×8–10 · Rows 4×10 · Face Pulls 3×15 · Curls 3×12' },
-                        { kind: 'Finisher', detail: 'Short EMOM · 6–8 min' },
-                        { kind: 'Cooldown', detail: 'Breath reset 2 min · light stretch' },
-                    ]}
-                    progressPct={viewingDay.isToday && !viewingDay.completed ? 30 : 100}
-                    locked={viewingDay.locked}
-                    completed={viewingDay.completed}
-                    isToday={viewingDay.isToday}
-                    reviewOnly={reviewOnly}
-                    onStart={() => {
-                        // Navigate to Library for this day; keep UI in-progress locally
-                        const params = new URLSearchParams({ week: String(selectedWeek), day: viewingDay.day });
-                        router.push(`/library?${params.toString()}`);
-                    }}
-                    onComplete={handleCompleteToday}
-                />
+                <div key={`days-${selectedWeek}`} className="mt-6 animate-fade-slide-up">
+                    <div className="mb-2 flex items-center justify-between">
+                        <div className="text-sm text-zinc-400">This week</div>
+                        <div className="text-xs font-semibold text-zinc-300">{daysCompleted}/7 completed</div>
+                    </div>
+                    <DayPills
+                        days={computedDays}
+                        selectedDayKey={viewDayKey}
+                        todayKey={todayDay.day}
+                        onSelect={(d) => {
+                            if (!d.locked) setViewDayKey(d.day);
+                        }}
+                    />
+                    <WeekSummaryStrip percent={(daysCompleted / 7) * 100} />
+                </div>
+
+                <div key={`sess-${viewingDay.day}`} className="mt-6 animate-soft-pop">
+                    <TodaysSession
+                        aiActive={aiActive}
+                        title={`${viewingDay.label}: ${viewingDay.type} · ${viewingDay.activity}`}
+                        blocks={[
+                            { kind: 'Warm-up', detail: '8–10 min mobility + activation' },
+                            { kind: 'Main', detail: 'Pull-ups 4×8–10 · Rows 4×10 · Face Pulls 3×15 · Curls 3×12' },
+                            { kind: 'Finisher', detail: 'Short EMOM · 6–8 min' },
+                            { kind: 'Cooldown', detail: 'Breath reset 2 min · light stretch' },
+                        ]}
+                        progressPct={viewingDay.isToday && !viewingDay.completed ? 30 : 100}
+                        ctaHref="/program"
+                        locked={viewingDay.locked}
+                        completed={viewingDay.completed}
+                        isToday={viewingDay.isToday}
+                        reviewOnly={reviewOnly}
+                        onComplete={
+                            viewingDay.isToday && !viewingDay.completed && !reviewOnly ? handleCompleteToday : undefined
+                        }
+                    />
+                </div>
             </div>
-        </div>
+        </Mount>
     );
 }
