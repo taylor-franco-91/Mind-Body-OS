@@ -1,93 +1,132 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { addCompleted, loadWeekState, saveWeekState, isCompleted, isMissed } from '@/lib/programStorage';
-import { DOW_KEYS } from '@/lib/programClock';
+import { useEffect, useMemo, useState } from 'react';
+import { todayKey as clockTodayKey } from '@/lib/programClock';
 
-type DayKey = typeof DOW_KEYS[number];
+type Status = 'idle' | 'inProgress' | 'completed';
+const LS_KEY = 'workoutState_v1';
 
-const DAY_LABEL: Record<DayKey, string> = {
+const DAY_LABEL: Record<'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN', string> = {
     MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday',
-    FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday'
+    FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday',
 };
 
-export default function LibraryPage() {
-    const router = useRouter();
-    const sp = useSearchParams();
-    const week = Number(sp.get('week') || '1');
-    const day = (sp.get('day') || 'MON') as DayKey;
+const DAY_TEMPLATE: Record<'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN', { type: string; activity: string }> = {
+    MON: { type: 'Upper', activity: 'Push Power' },
+    TUE: { type: 'Mindset', activity: 'Meditation' },
+    WED: { type: 'Lower', activity: 'Squat Focus' },
+    THU: { type: 'Upper', activity: 'Pull Power' },
+    FRI: { type: 'Full Body', activity: 'HIIT Circuit' },
+    SAT: { type: 'Mindset', activity: 'Journaling' },
+    SUN: { type: 'Recovery', activity: 'Active Rest' },
+};
 
-    const completed = isCompleted(week, day);
-    const missed = isMissed(week, day);
-    const [phase, setPhase] = useState<'in_progress' | 'completed'>(completed ? 'completed' : 'in_progress');
-
-    const title = useMemo(() => `${DAY_LABEL[day]} · Workout Library`, [day]);
-
-    const blocks = [
-        { kind: 'Warm-up', detail: '8–10 min mobility + activation' },
-        { kind: 'Main', detail: 'Pull-ups 4×8–10 · Rows 4×10 · Face Pulls 3×15 · Curls 3×12' },
-        { kind: 'Finisher', detail: 'Short EMOM · 6–8 min' },
-        { kind: 'Cooldown', detail: 'Breath reset 2 min · light stretch' },
+function defaultBlocks() {
+    return [
+        { kind: 'Warm-up', detail: '8-10 min mobility + activation' },
+        { kind: 'Main', detail: 'Pull-ups 4x8-10 - Rows 4x10 - Face Pulls 3x15 - Curls 3x12' },
+        { kind: 'Finisher', detail: 'Short EMOM - 6-8 min' },
+        { kind: 'Cooldown', detail: 'Breath reset 2 min - light stretch' },
     ];
+}
 
-    function handleComplete() {
-        if (missed || completed) return;
-        addCompleted(week, day);
-        const state = loadWeekState(week);
-        state.missed = state.missed.filter(d => d !== day);
-        saveWeekState(week, state);
-        setPhase('completed');
-        window.dispatchEvent(new CustomEvent('os:workout-completed', { detail: { week, day } }));
+function fallbackTodayKey(): 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' {
+    const d = new Date();
+    return (['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const)[d.getDay()];
+}
+
+function resolveDayKey(raw: string | null): 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' {
+    if (!raw || raw === 'TODAY') {
+        try { return clockTodayKey(); } catch { return fallbackTodayKey(); }
     }
+    const up = raw.toUpperCase();
+    if (['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].includes(up)) return up as any;
+    const byLabel: Record<string, any> = {
+        MONDAY: 'MON', TUESDAY: 'TUE', WEDNESDAY: 'WED', THURSDAY: 'THU', FRIDAY: 'FRI', SATURDAY: 'SAT', SUNDAY: 'SUN'
+    };
+    return (byLabel[up] ?? fallbackTodayKey()) as any;
+}
+
+export default function LibraryPage() {
+    const params = useSearchParams();
+    const router = useRouter();
+
+    const dayParam = params.get('day');
+    const dayKey = useMemo(() => resolveDayKey(dayParam), [dayParam]);
+
+    const [status, setStatus] = useState<Status>('idle');
+
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(LS_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw) as { day: string; status: Status };
+                if (parsed.day === dayKey) setStatus(parsed.status);
+            }
+        } catch { }
+    }, [dayKey]);
+
+    function setLS(next: Status) {
+        localStorage.setItem(LS_KEY, JSON.stringify({ day: dayKey, status: next }));
+        setStatus(next);
+    }
+
+    function finishAndReturn() {
+        setLS('completed');
+        router.push('/program?complete=1');
+    }
+
+    const session = useMemo(() => {
+        const meta = DAY_TEMPLATE[dayKey];
+        const title = `${DAY_LABEL[dayKey]}: ${meta.type} - ${meta.activity}`;
+        return { title, blocks: defaultBlocks() };
+    }, [dayKey]);
 
     return (
         <div className="p-8 text-white">
-            <div className="mb-4 flex items-center justify-between">
-                <h1 className="text-2xl font-bold">{title}</h1>
-
-                {missed ? (
-                    <span className="rounded-full bg-rose-500/15 px-3 py-1 text-sm text-rose-300 ring-1 ring-rose-300/30">
-                        Review Only (Missed)
+            <div className="flex items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold">Workout Library · {DAY_LABEL[dayKey]}</h1>
+                    <p className="mt-2 text-zinc-400">Form demos, cues, and timing live here.</p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
+                    Status: <span className="font-semibold text-zinc-100">
+                        {status === 'inProgress' ? 'in progress' : status}
                     </span>
-                ) : phase === 'completed' ? (
-                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm text-emerald-300 ring-1 ring-emerald-400/30">
-                        Workout complete
-                    </span>
-                ) : (
-                    <div className="flex items-center gap-2">
-                        <span className="rounded-xl bg-white/10 px-3 py-1.5 text-sm text-white ring-1 ring-white/15">
-                            Workout in progress
-                        </span>
-                        <button
-                            type="button"
-                            onClick={handleComplete}
-                            className="rounded-xl bg-gradient-to-r from-lime-400 to-cyan-400 px-3 py-1.5 text-sm font-semibold text-black hover:opacity-90 active:opacity-80"
-                        >
-                            Mark Complete
-                        </button>
-                    </div>
-                )}
+                </div>
             </div>
 
-            {/* Example library content */}
-            <div className="grid gap-3">
-                {blocks.map((b, i) => (
-                    <div key={i} className="rounded-lg border border-white/10 bg-black/30 p-3">
-                        <div className="text-xs uppercase tracking-wide text-zinc-400">{b.kind}</div>
-                        <div className="text-sm text-zinc-200">{b.detail}</div>
-                    </div>
-                ))}
-            </div>
+            {/* Session Details */}
+            <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5">
+                <div className="text-sm font-semibold text-zinc-100">{session.title}</div>
+                <div className="mt-3 space-y-3">
+                    {session.blocks.map((b, idx) => (
+                        <div key={idx} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                            <div className="text-xs uppercase tracking-wide text-zinc-400">{b.kind}</div>
+                            <div className="text-sm text-zinc-200 mt-1">{b.detail}</div>
+                        </div>
+                    ))}
+                </div>
 
-            <div className="mt-6 flex justify-end">
-                <button
-                    type="button"
-                    onClick={() => router.push('/program')}
-                    className="rounded-xl bg-white/10 px-3 py-1.5 text-sm text-white ring-1 ring-white/15 hover:bg-white/15"
-                >
-                    Back to Program
-                </button>
+                <div className="mt-5 flex flex-wrap gap-3">
+                    {/* Disabled indicator: Workout in progress */}
+                    <button
+                        disabled
+                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-emerald-300 cursor-not-allowed"
+                        title="Workout in progress"
+                    >
+                        Workout in progress
+                    </button>
+
+                    {/* Action: Mark Complete (always clickable) */}
+                    <button
+                        onClick={finishAndReturn}
+                        className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+                    >
+                        Mark Complete
+                    </button>
+                </div>
             </div>
         </div>
     );
