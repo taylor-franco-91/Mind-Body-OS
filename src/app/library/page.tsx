@@ -56,7 +56,9 @@ export default function LibraryPage() {
     const dayKey = useMemo(() => resolveDayKey(dayParam), [dayParam]);
 
     const [status, setStatus] = useState<Status>('idle');
+    const [busy, setBusy] = useState(false); // guards double-click during navigation
 
+    // Load persisted status for this day
     useEffect(() => {
         try {
             const raw = localStorage.getItem(LS_KEY);
@@ -73,7 +75,13 @@ export default function LibraryPage() {
     }
 
     function finishAndReturn() {
+        if (busy || status === 'completed') return;
+        setBusy(true);
+
+        // Immediately lock UI locally
         setLS('completed');
+
+        // Navigate back to Program to finalize there as well
         router.push('/program?complete=1');
     }
 
@@ -83,6 +91,10 @@ export default function LibraryPage() {
         return { title, blocks: defaultBlocks() };
     }, [dayKey]);
 
+    // Derive which CTAs to show
+    const isCompleted = status === 'completed';
+    const isInProgress = status === 'inProgress';
+
     return (
         <div className="p-8 text-white">
             <div className="flex items-end justify-between gap-4">
@@ -91,8 +103,9 @@ export default function LibraryPage() {
                     <p className="mt-2 text-zinc-400">Form demos, cues, and timing live here.</p>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
-                    Status: <span className="font-semibold text-zinc-100">
-                        {status === 'inProgress' ? 'in progress' : status}
+                    Status:{" "}
+                    <span className="font-semibold text-zinc-100">
+                        {isCompleted ? 'completed' : (isInProgress ? 'in progress' : status)}
                     </span>
                 </div>
             </div>
@@ -109,23 +122,42 @@ export default function LibraryPage() {
                     ))}
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                    {/* Disabled indicator: Workout in progress */}
-                    <button
-                        disabled
-                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-emerald-300 cursor-not-allowed"
-                        title="Workout in progress"
-                    >
-                        Workout in progress
-                    </button>
+                <div className="mt-5 flex flex-wrap gap-3 items-center">
+                    {isCompleted ? (
+                        // Completed state: single disabled pill with green-highlighted text + check
+                        <button
+                            disabled
+                            className="rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300 cursor-not-allowed"
+                            title="Workout complete"
+                        >
+                            ✅ Workout complete
+                        </button>
+                    ) : (
+                        <>
+                            {/* Disabled indicator: Workout in progress */}
+                            <button
+                                disabled
+                                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-emerald-300 cursor-not-allowed"
+                                title="Workout in progress"
+                            >
+                                Workout in progress
+                            </button>
 
-                    {/* Action: Mark Complete (always clickable) */}
-                    <button
-                        onClick={finishAndReturn}
-                        className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
-                    >
-                        Mark Complete
-                    </button>
+                            {/* Action: Mark Complete (clickable once) */}
+                            <button
+                                onClick={finishAndReturn}
+                                disabled={busy}
+                                className={
+                                    busy
+                                        ? 'rounded-2xl bg-emerald-400/70 px-4 py-2 text-sm font-semibold text-black cursor-not-allowed'
+                                        : 'rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90'
+                                }
+                                title="Mark this session complete"
+                            >
+                                {busy ? 'Completing...' : 'Mark Complete'}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
