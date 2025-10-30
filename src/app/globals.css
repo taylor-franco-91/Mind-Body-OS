@@ -98,3 +98,132 @@ body {
 .animate-halo {
   animation: halo-pulse 700ms ease-out forwards;
 }
+
+@keyframes avatarIdle {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-0.3px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes avatarMicro {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 rgba(60, 240, 185, 0));
+  }
+
+  35% {
+    transform: translateY(-0.8px) scale(1.003);
+    filter: drop-shadow(0 0 8px rgba(60, 240, 185, 0.25));
+  }
+
+  70% {
+    transform: translateY(-0.3px) scale(1.001);
+    filter: drop-shadow(0 0 4px rgba(60, 240, 185, 0.18));
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 rgba(60, 240, 185, 0));
+  }
+}
+
+@keyframes avatarHalo {
+  0% {
+    opacity: 0.0;
+  }
+
+  40% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.animate-avatar-idle {
+  animation: avatarIdle 6s ease-in-out infinite;
+}
+
+.animate-avatar-micro {
+  animation: avatarMicro 1.2s ease-out 1 forwards, avatarIdle 6s 1.2s ease-in-out infinite;
+}
+
+.animate-avatar-halo {
+  animation: avatarHalo 1.2s ease-out 1 forwards;
+}
+
+@keyframes avatar-breath {
+  0% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(1.012);
+  }
+
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes avatar-sway {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(0.3deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes avatar-pulse {
+  0% {
+    opacity: 0.25;
+    filter: drop-shadow(0 0 0px rgba(98, 255, 203, 0.0));
+  }
+
+  50% {
+    opacity: 0.42;
+    filter: drop-shadow(0 0 6px rgba(98, 255, 203, 0.25));
+  }
+
+  100% {
+    opacity: 0.25;
+    filter: drop-shadow(0 0 0px rgba(98, 255, 203, 0.0));
+  }
+}
+
+/* base */
+.avatar-breath {
+  animation: avatar-breath 4.3s ease-in-out infinite;
+}
+
+.avatar-sway {
+  animation: avatar-sway 6.8s ease-in-out infinite;
+}
+
+.avatar-pulse {
+  animation: avatar-pulse 2.8s ease-in-out infinite;
+}
+
+/* slight boost when active */
+.avatar-breath--active {
+  animation-duration: 3.6s;
+}
+
+.avatar-pulse--active {
+  animation-duration: 2.2s;
+}

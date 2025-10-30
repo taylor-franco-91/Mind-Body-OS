@@ -1,163 +1,139 @@
 'use client';
 
-import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { todayKey as clockTodayKey } from '@/lib/programClock';
+import { EXERCISES } from '@/lib/exercises';
+import dynamic from 'next/dynamic';
 
-type Status = 'idle' | 'inProgress' | 'completed';
-const LS_KEY = 'workoutState_v1';
+// Load the 3D avatar only on the client to avoid hydration issues
+const Avatar3D = dynamic(() => import('@/components/library/Avatar3D'), { ssr: false });
 
-const DAY_LABEL: Record<'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN', string> = {
-    MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday',
-    FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday',
+type SessionStatus = 'idle' | 'in_progress' | 'complete';
+type DayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
+type ActiveSession = {
+    week: number;
+    dayKey: DayKey;
+    status: SessionStatus;
+    exerciseIds: string[];
 };
-
-const DAY_TEMPLATE: Record<'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN', { type: string; activity: string }> = {
-    MON: { type: 'Upper', activity: 'Push Power' },
-    TUE: { type: 'Mindset', activity: 'Meditation' },
-    WED: { type: 'Lower', activity: 'Squat Focus' },
-    THU: { type: 'Upper', activity: 'Pull Power' },
-    FRI: { type: 'Full Body', activity: 'HIIT Circuit' },
-    SAT: { type: 'Mindset', activity: 'Journaling' },
-    SUN: { type: 'Recovery', activity: 'Active Rest' },
-};
-
-function defaultBlocks() {
-    return [
-        { kind: 'Warm-up', detail: '8-10 min mobility + activation' },
-        { kind: 'Main', detail: 'Pull-ups 4x8-10 - Rows 4x10 - Face Pulls 3x15 - Curls 3x12' },
-        { kind: 'Finisher', detail: 'Short EMOM - 6-8 min' },
-        { kind: 'Cooldown', detail: 'Breath reset 2 min - light stretch' },
-    ];
-}
-
-function fallbackTodayKey(): 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' {
-    const d = new Date();
-    return (['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const)[d.getDay()];
-}
-
-function resolveDayKey(raw: string | null): 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' {
-    if (!raw || raw === 'TODAY') {
-        try { return clockTodayKey(); } catch { return fallbackTodayKey(); }
-    }
-    const up = raw.toUpperCase();
-    if (['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].includes(up)) return up as any;
-    const byLabel: Record<string, any> = {
-        MONDAY: 'MON', TUESDAY: 'TUE', WEDNESDAY: 'WED', THURSDAY: 'THU', FRIDAY: 'FRI', SATURDAY: 'SAT', SUNDAY: 'SUN'
-    };
-    return (byLabel[up] ?? fallbackTodayKey()) as any;
-}
 
 export default function LibraryPage() {
-    const params = useSearchParams();
-    const router = useRouter();
+    const [session, setSession] = useState<ActiveSession | null>(null);
 
-    const dayParam = params.get('day');
-    const dayKey = useMemo(() => resolveDayKey(dayParam), [dayParam]);
-
-    const [status, setStatus] = useState<Status>('idle');
-    const [busy, setBusy] = useState(false); // guards double-click during navigation
-
-    // Load persisted status for this day
+    // Load once on mount
     useEffect(() => {
         try {
-            const raw = localStorage.getItem(LS_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw) as { day: string; status: Status };
-                if (parsed.day === dayKey) setStatus(parsed.status);
-            }
-        } catch { }
-    }, [dayKey]);
+            const raw = localStorage.getItem('activeSession');
+            if (!raw) return;
+            setSession(JSON.parse(raw));
+        } catch {
+            /* noop */
+        }
+    }, []);
 
-    function setLS(next: Status) {
-        localStorage.setItem(LS_KEY, JSON.stringify({ day: dayKey, status: next }));
-        setStatus(next);
+    const exercises = useMemo(() => {
+        if (!session) return [];
+        return (session.exerciseIds || []).map((id) => ({
+            id,
+            title: EXERCISES[id]?.title ?? id,
+            video: EXERCISES[id]?.video ?? null,
+            cues: EXERCISES[id]?.cues ?? [],
+        }));
+    }, [session]);
+
+    function updateStatus(next: SessionStatus) {
+        if (!session) return;
+        const updated = { ...session, status: next };
+        setSession(updated);
+        try {
+            localStorage.setItem('activeSession', JSON.stringify(updated));
+        } catch {
+            /* noop */
+        }
     }
 
-    function finishAndReturn() {
-        if (busy || status === 'completed') return;
-        setBusy(true);
-
-        // Immediately lock UI locally
-        setLS('completed');
-
-        // Navigate back to Program to finalize there as well
-        router.push('/program?complete=1');
+    if (!session) {
+        return (
+            <div className="p-8 text-white">
+                <h1 className="text-2xl font-bold">Workout Library</h1>
+                <p className="mt-2 text-zinc-400">No active session. Start today’s workout from the Program page.</p>
+            </div>
+        );
     }
 
-    const session = useMemo(() => {
-        const meta = DAY_TEMPLATE[dayKey];
-        const title = `${DAY_LABEL[dayKey]}: ${meta.type} - ${meta.activity}`;
-        return { title, blocks: defaultBlocks() };
-    }, [dayKey]);
-
-    // Derive which CTAs to show
-    const isCompleted = status === 'completed';
-    const isInProgress = status === 'inProgress';
+    const inProgress = session.status === 'in_progress';
+    const isComplete = session.status === 'complete';
+    const avatarStatus: SessionStatus = isComplete ? 'complete' : inProgress ? 'in_progress' : 'idle';
 
     return (
         <div className="p-8 text-white">
-            <div className="flex items-end justify-between gap-4">
+            <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold">Workout Library · {DAY_LABEL[dayKey]}</h1>
-                    <p className="mt-2 text-zinc-400">Form demos, cues, and timing live here.</p>
+                    <h1 className="text-2xl font-bold">Workout Library</h1>
+                    <p className="mt-1 text-zinc-400">
+                        Week {session.week} · {session.dayKey}
+                    </p>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
-                    Status:{" "}
-                    <span className="font-semibold text-zinc-100">
-                        {isCompleted ? 'completed' : (isInProgress ? 'in progress' : status)}
-                    </span>
+
+                {/* Status controls mirror Program page */}
+                <div className="flex items-center gap-3">
+                    {!inProgress && !isComplete && (
+                        <button
+                            onClick={() => updateStatus('in_progress')}
+                            className="rounded-xl bg-gradient-to-r from-lime-400 to-cyan-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+                        >
+                            Start Workout
+                        </button>
+                    )}
+                    {inProgress && (
+                        <button
+                            onClick={() => updateStatus('complete')}
+                            className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                        >
+                            Mark Complete
+                        </button>
+                    )}
+                    {isComplete && (
+                        <span className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-300">
+                            Workout Complete
+                        </span>
+                    )}
                 </div>
             </div>
 
-            {/* Session Details */}
-            <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5">
-                <div className="text-sm font-semibold text-zinc-100">{session.title}</div>
-                <div className="mt-3 space-y-3">
-                    {session.blocks.map((b, idx) => (
-                        <div key={idx} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                            <div className="text-xs uppercase tracking-wide text-zinc-400">{b.kind}</div>
-                            <div className="text-sm text-zinc-200 mt-1">{b.detail}</div>
-                        </div>
-                    ))}
-                </div>
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* 3D Avatar reacts to status */}
+                <Avatar3D status={avatarStatus} />
 
-                <div className="mt-5 flex flex-wrap gap-3 items-center">
-                    {isCompleted ? (
-                        // Completed state: single disabled pill with green-highlighted text + check
-                        <button
-                            disabled
-                            className="rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300 cursor-not-allowed"
-                            title="Workout complete"
-                        >
-                            ✅ Workout complete
-                        </button>
-                    ) : (
-                        <>
-                            {/* Disabled indicator: Workout in progress */}
-                            <button
-                                disabled
-                                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-emerald-300 cursor-not-allowed"
-                                title="Workout in progress"
-                            >
-                                Workout in progress
-                            </button>
-
-                            {/* Action: Mark Complete (clickable once) */}
-                            <button
-                                onClick={finishAndReturn}
-                                disabled={busy}
-                                className={
-                                    busy
-                                        ? 'rounded-2xl bg-emerald-400/70 px-4 py-2 text-sm font-semibold text-black cursor-not-allowed'
-                                        : 'rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-black hover:opacity-90'
-                                }
-                                title="Mark this session complete"
-                            >
-                                {busy ? 'Completing...' : 'Mark Complete'}
-                            </button>
-                        </>
-                    )}
+                {/* Exercise list + videos */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                    <div className="text-sm text-zinc-400">Today’s Movements</div>
+                    <ul className="mt-3 space-y-3">
+                        {exercises.map((ex) => (
+                            <li key={ex.id} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                                <div className="font-medium">{ex.title}</div>
+                                {ex.cues?.length ? (
+                                    <ul className="mt-1 list-disc pl-5 text-xs text-zinc-400">
+                                        {ex.cues.map((c: string, i: number) => (
+                                            <li key={i}>{c}</li>
+                                        ))}
+                                    </ul>
+                                ) : null}
+                                {ex.video ? (
+                                    <video
+                                        className="mt-3 w-full rounded-lg ring-1 ring-white/10"
+                                        src={ex.video}
+                                        autoPlay
+                                        muted
+                                        loop
+                                        playsInline
+                                    />
+                                ) : (
+                                    <div className="mt-3 text-xs text-zinc-500">Demo video not available.</div>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </div>
         </div>
