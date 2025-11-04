@@ -26,4 +26,4 @@ To fuse AI, data, and psychology to create a next-gen human performance OS that 
 
 ## 👤 Built by
 **Taylor Franco**  
-[LinkedIn](your-linkedin-url) | [Portfolio](your-site-if-you-have-one)
+[LinkedIn]([your-linkedin-url](https://www.linkedin.com/in/taylor-franco-982518140/)) | [Portfolio]([your-site-if-you-have-one](https://taylor-franco-portfolio.netlify.app/))
