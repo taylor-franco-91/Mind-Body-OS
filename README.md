@@ -1,3 +1,8 @@
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+
+
 # 🧠 Mind-Body OS
 
 **AI-Adaptive Fitness Operating System**
@@ -26,4 +31,5 @@ To fuse AI, data, and psychology to create a next-gen human performance OS that 
 
 ## 👤 Built by
 **Taylor Franco**  
-[LinkedIn]([your-linkedin-url](https://www.linkedin.com/in/taylor-franco-982518140/)) | [Portfolio]([your-site-if-you-have-one](https://taylor-franco-portfolio.netlify.app/))
+[LinkedIn](https://www.linkedin.com/in/taylor-franco-982518140/) | [Portfolio](https://taylor-franco-portfolio.netlify.app/)
+
